@@ -344,21 +344,13 @@ def get_prophet_evaluation(monthly):
 # LSTM FORECAST
 # =========================
 def run_lstm_forecast(monthly):
-    try:
-        import tensorflow as tf
-        from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
-        from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-        from tensorflow.keras.regularizers import l2
-        TF_AVAILABLE = True
-    except ImportError:
-        TF_AVAILABLE = False
-
+    import tensorflow as tf
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
+    from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+    from tensorflow.keras.regularizers import l2
     from sklearn.preprocessing import RobustScaler
     from sklearn.metrics import mean_absolute_error, mean_squared_error
-
-    if not TF_AVAILABLE:
-        return {}, {}, {}
 
     RND = 42
     np.random.seed(RND)
@@ -490,12 +482,12 @@ def run_lstm_forecast(monthly):
 # LSTM EVALUATION
 # =========================
 def get_lstm_evaluation(lstm_eval_data):
-    if not lstm_eval_data:
-        import pandas as pd
-        return pd.DataFrame(columns=["Account No", "MAE", "RMSE", "Error Ratio"])
+    import pandas as pd
     from sklearn.metrics import mean_absolute_error, mean_squared_error
-    # ... rest of function unchanged
- 
+
+    if not lstm_eval_data:
+        return pd.DataFrame(columns=["Account No", "MAE", "RMSE", "Error Ratio"])
+
     lstm_metrics = {}
     for acc, data in lstm_eval_data.items():
         vals = data["vals"]
@@ -530,15 +522,32 @@ def get_lstm_evaluation(lstm_eval_data):
 # MODEL COMPARISON
 # =========================
 def get_model_comparison(lstm_df, prophet_df_summary):
+    # If LSTM results are empty (TF not available), show Prophet-only table
+    if lstm_df.empty:
+        prophet_df_summary = prophet_df_summary.copy()
+        prophet_df_summary["MAE_LSTM"]        = "N/A"
+        prophet_df_summary["RMSE_LSTM"]       = "N/A"
+        prophet_df_summary["Error Ratio_LSTM"] = "N/A"
+        prophet_df_summary["Best Model"]       = "Prophet"
+        cols = ["Account No", "MAE_LSTM", "RMSE_LSTM", "Error Ratio_LSTM",
+                "MAE", "RMSE", "Error Ratio", "Best Model"]
+        cols = [c for c in cols if c in prophet_df_summary.columns]
+        return prophet_df_summary[cols].rename(columns={
+            "MAE": "MAE_Prophet", "RMSE": "RMSE_Prophet", "Error Ratio": "Error Ratio_Prophet"
+        })
+
     comparison_df = pd.merge(lstm_df, prophet_df_summary, on="Account No",
                               suffixes=("_LSTM", "_Prophet"))
 
     def select_best(row):
-        if abs(row["Error Ratio_LSTM"] - row["Error Ratio_Prophet"]) < 0.01:
-            return "Both"
-        elif row["Error Ratio_LSTM"] < row["Error Ratio_Prophet"]:
-            return "LSTM"
-        else:
+        try:
+            if abs(float(row["Error Ratio_LSTM"]) - float(row["Error Ratio_Prophet"])) < 0.01:
+                return "Both"
+            elif float(row["Error Ratio_LSTM"]) < float(row["Error Ratio_Prophet"]):
+                return "LSTM"
+            else:
+                return "Prophet"
+        except (TypeError, ValueError):
             return "Prophet"
 
     comparison_df["Best Model"] = comparison_df.apply(select_best, axis=1)
