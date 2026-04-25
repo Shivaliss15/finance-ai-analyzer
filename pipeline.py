@@ -344,13 +344,21 @@ def get_prophet_evaluation(monthly):
 # LSTM FORECAST
 # =========================
 def run_lstm_forecast(monthly):
-    import tensorflow as tf
-    from tensorflow.keras.models import Sequential
-    from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
-    from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-    from tensorflow.keras.regularizers import l2
+    try:
+        import tensorflow as tf
+        from tensorflow.keras.models import Sequential
+        from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
+        from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+        from tensorflow.keras.regularizers import l2
+        TF_AVAILABLE = True
+    except ImportError:
+        TF_AVAILABLE = False
+
     from sklearn.preprocessing import RobustScaler
     from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+    if not TF_AVAILABLE:
+        return {}, {}, {}
 
     RND = 42
     np.random.seed(RND)
